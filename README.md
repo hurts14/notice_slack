@@ -1,0 +1,2 @@
+# notice_slack
+日経平均と日経VIの始値をslackに通知するプログラム
