@@ -41,7 +41,6 @@ def get_google_spread(date):
 
 
 def set_vix(vix, nikkei):
-
     gc = gspread.authorize(CREDENTIALS)
     SPREADSHEET_KEY = '14kv6zXOJUoGJev7UzRekhKO0wuvLQR6vlsS0n9x42m4'
     worksheet = gc.open_by_key(SPREADSHEET_KEY).worksheet('open_225vi')
@@ -63,7 +62,7 @@ def request_nikkei():
     df = pd.read_csv(io.StringIO(r.decode('shift-jis')), header=0, skipfooter=1, engine='python')
     col = ['Date', 'Close', 'Open', 'High', 'Low']
     df.columns = col
-    df['Date'] = pd.to_datetime(df['Date'])
+    #df['Date'] = pd.to_datetime(df['Date'])
     return df
 
 
@@ -71,19 +70,104 @@ def request_vix():
     #VIX_OHLCを取得
     vix_url = 'https://indexes.nikkei.co.jp/nkave/historical/nikkei_stock_average_vi_daily_jp.csv'
     r = requests.get(vix_url).content
+    print('VIX')
     df = pd.read_csv(io.StringIO(r.decode('shift-jis')), header=0, skipfooter=1, engine='python')
     col = ['Date', 'Close', 'Open', 'High', 'Low']
     df.columns = col
-    df['Date'] = pd.to_datetime(df['Date'])
     return df
+
+
+def last_day(brand): #'VIX' or 'Nikkei' or 'Open'
+    s = ''
+    if 'VIX' == brand:
+        s = 'VIX_OHLC'
+    elif 'Nikkei' == brand:
+        s = 'Nikkei_OHLC'
+    else:
+        s = 'open_225vi'
+    gc = gspread.authorize(CREDENTIALS)
+    SPREADSHEET_KEY = '14kv6zXOJUoGJev7UzRekhKO0wuvLQR6vlsS0n9x42m4'
+    worksheet = gc.open_by_key(SPREADSHEET_KEY).worksheet(s)
+    all_len = len(worksheet.get_all_values())
+    value = worksheet.acell('A'+str(all_len)).value
+    
+    return value
+
+def insert_value(value_list, brand): #'VIX' or 'Nikkei' or 'Open'
+    s = ''
+    if 'VIX' == brand:
+        s = 'VIX_OHLC'
+    elif 'Nikkei' == brand:
+        s = 'Nikkei_OHLC'
+    else:
+        s = 'open_225vi'
+    gc = gspread.authorize(CREDENTIALS)
+    SPREADSHEET_KEY = '14kv6zXOJUoGJev7UzRekhKO0wuvLQR6vlsS0n9x42m4'
+    worksheet = gc.open_by_key(SPREADSHEET_KEY).worksheet(s)
+    worksheet.append_row(value_list)
+
+
+def insert_allvix(df):
+    gc = gspread.authorize(CREDENTIALS)
+    SPREADSHEET_KEY = '14kv6zXOJUoGJev7UzRekhKO0wuvLQR6vlsS0n9x42m4'
+    worksheet = gc.open_by_key(SPREADSHEET_KEY).worksheet('VIX_OHLC')
+    index_num = df.shape[0]
+
+    cell_list = worksheet.range('A2:E'+ str(index_num+1))
+    for cell in cell_list:
+        val = df.iloc[cell.row-2][cell.col-1]
+        cell.value = val
+    worksheet.update_cells(cell_list)
+
+    
+def insert_allnikkei(df):
+    gc = gspread.authorize(CREDENTIALS)
+    SPREADSHEET_KEY = '14kv6zXOJUoGJev7UzRekhKO0wuvLQR6vlsS0n9x42m4'
+    worksheet = gc.open_by_key(SPREADSHEET_KEY).worksheet('Nikkei_OHLC')
+    index_num = df.shape[0]
+
+    cell_list = worksheet.range('A2:E'+ str(index_num+1))
+    for cell in cell_list:
+        val = df.iloc[cell.row-2][cell.col-1]
+        cell.value = val
+    worksheet.update_cells(cell_list)
+
+
+def all_insert():
+    df_vix = request_vix()
+    df_nikkei = request_nikkei()
+    insert_allvix(df_vix)
+    insert_allnikkei(df_nikkei)
+    print('done')
+
+
+def scraping_data():
+    #lastday todayまでのデータを挿入
+    df_vix = request_vix()
+    df_nikkei = request_nikkei()
+    df_vix['Date'] = pd.to_datetime(df_vix['Date'])
+    df_nikkei['Date'] = pd.to_datetime(df_nikkei['Date'])
+    lastday_vix = last_day('VIX')
+    lastday_nikkei = last_day('Nikkei')
+
+    df_vix[(lastday_vix < df_vix['Date']) & (NOW >= df_vix['Date'])]
+    df_nikkei[(lastday_nikkei < df_nikkei['Date']) & (NOW >= df_nikkei['Date'])]
+    df_vix['Date'] = df_vix['Date'].dt.strftime('%Y/%m/%d')
+    df_nikkei['Date'] = df_nikkei['Date'].dt.strftime('%Y/%m/%d')
+    list_vix = df_vix.values.tolist()
+    list_nikkei = df_nikkei.values.tolist()
+
+    insert_value(list_vix, 'VIX')
+    insert_value(list_nikkei, 'Nikkei')
 
 
 def main():
     print('hello')
     #set_vix(5,10)
     #v, n = get_google_spread(NOW)
-    #print('{},{}'.format(v,n))
+    #print('{},{}'.format(last_day('VIX'),last_day('Nikkei')))
     #request_vix()
+    #all_insert()
     
 
 if __name__ == "__main__":
