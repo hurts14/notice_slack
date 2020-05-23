@@ -1,0 +1,9 @@
+#.gitignore
+scr/*.json
+scr/*.csv
+scr/*.tsv
+
+.DS_Store
+.AppleDouble
+.LSOverride
+
